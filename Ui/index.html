@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O₂Dream | Cosmic AI Chat</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for sanitizing HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.8/dist/purify.min.js"></script>
+    <style>
+        body {
+            background-color: #000;
+            color: #e0e0e0;
+        }
+        #space-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .glass-panel {
+            background: rgba(10, 5, 20, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .chat-bubble {
+            background: rgba(30, 20, 50, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        /* Custom Scrollbar */
+        #chat-window::-webkit-scrollbar { width: 8px; }
+        #chat-window::-webkit-scrollbar-track { background: transparent; }
+        #chat-window::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+        #chat-window::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+        
+        /* Typing Indicator */
+        .typing-indicator span { height: 8px; width: 8px; background-color: #a78bfa; border-radius: 50%; display: inline-block; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+
+        /* Code Block Styling */
+        pre { background-color: rgba(0, 0, 0, 0.3); color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.1); }
+        code { font-family: 'Courier New', monospace; }
+        
+        /* Control Buttons Styling */
+        .control-btn { transition: all 0.2s ease-in-out; }
+        .control-btn.active { background-color: #8b5cf6; color: white; box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
+        .control-btn:not(.active) { background-color: rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="flex justify-center items-center h-screen p-4">
+
+    <canvas id="space-canvas"></canvas>
+
+    <div class="glass-panel rounded-2xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col shadow-2xl shadow-purple-500/10">
+        
+        <!-- Header -->
+        <header class="p-4 border-b border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-xl font-bold text-white">Cosmic AI</h1>
+            <div class="flex items-center gap-2 p-1 rounded-full bg-black/20">
+                <button id="mode-chat" class="control-btn active px-4 py-1 rounded-full text-sm font-semibold">Chat</button>
+                <button id="mode-code" class="control-btn px-4 py-1 rounded-full text-sm font-semibold">Code</button>
+            </div>
+        </header>
+
+        <!-- Chat Window -->
+        <main id="chat-window" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div class="flex items-end gap-3">
+                <div class="bg-violet-500 rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg shrink-0">AI</div>
+                <div class="chat-bubble p-3 rounded-lg max-w-lg">
+                    <p>Welcome! Select a mode and send a message.</p>
+                    <p class="text-xs text-gray-400 mt-2">In Chat Mode, you can use `img:` for images.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer / Input Area -->
+        <footer class="p-4 border-t border-white/10">
+            <div id="verbosity-controls" class="hidden justify-center items-center gap-2 mb-3 p-1 rounded-full bg-black/20 max-w-xs mx-auto">
+                <span class="text-xs font-bold px-2">Verbosity:</span>
+                <button data-verbosity="low" class="control-btn verbosity-btn px-3 py-1 rounded-full text-xs">Low</button>
+                <button data-verbosity="medium" class="control-btn verbosity-btn active px-3 py-1 rounded-full text-xs">Medium</button>
+                <button data-verbosity="high" class="control-btn verbosity-btn px-3 py-1 rounded-full text-xs">High</button>
+            </div>
+            <form id="chat-form" class="flex items-center gap-3">
+                <input 
+                    type="text" 
+                    id="message-input"
+                    placeholder="Send a message..."
+                    class="flex-1 bg-black/30 border border-white/10 rounded-full py-3 px-5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all text-white placeholder-gray-400"
+                    autocomplete="off"
+                >
+                <button type="submit" class="bg-violet-600 hover:bg-violet-700 rounded-full w-12 h-12 flex items-center justify-center shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const chatWindow = document.getElementById('chat-window');
+            const chatForm = document.getElementById('chat-form');
+            const messageInput = document.getElementById('message-input');
+            const modeChatBtn = document.getElementById('mode-chat');
+            const modeCodeBtn = document.getElementById('mode-code');
+            const verbosityControls = document.getElementById('verbosity-controls');
+            const verbosityBtns = document.querySelectorAll('.verbosity-btn');
+
+            // --- API & State Configuration ---
+            const CHAT_API_ENDPOINT = 'http://localhost:8000/chat/gen';
+            const CODE_API_ENDPOINT = 'http://localhost:8000/code/gen';
+            let currentMode = 'chat';
+            let currentVerbosity = 'medium';
+            let sessionId = sessionStorage.getItem('chat_session_id') || `web-${Date.now()}`;
+            sessionStorage.setItem('chat_session_id', sessionId);
+
+            // --- UI Functions ---
+            const appendMessage = (sender, content) => {
+                const isUser = sender === 'user';
+                const messageWrapper = document.createElement('div');
+                messageWrapper.className = `flex items-end gap-3 ${isUser ? 'justify-end' : ''}`;
+                const bubble = `<div class="chat-bubble p-3 rounded-lg max-w-lg">${content}</div>`;
+                const avatar = `<div class="bg-${isUser ? 'gray' : 'violet'}-500 rounded-full h-10 w-10 flex items-center justify-center font-bold text-lg shrink-0">${isUser ? 'You' : 'AI'}</div>`;
+                messageWrapper.innerHTML = isUser ? bubble + avatar : avatar + bubble;
+                chatWindow.appendChild(messageWrapper);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                return messageWrapper;
+            };
+            const showTypingIndicator = () => { const content = `<div class="typing-indicator"><span></span><span></span><span></span></div>`; const indicatorWrapper = appendMessage('ai', content); indicatorWrapper.id = 'typing-indicator'; };
+            const removeTypingIndicator = () => { document.getElementById('typing-indicator')?.remove(); };
+            const processAIResponse = (text) => {
+                const urlRegex = /(https?:\/\/[^\s]+(\.png|\.jpg|\.jpeg|\.gif|\.webp))/g;
+                if (text.match(urlRegex)) { return text.replace(urlRegex, url => `<a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" alt="Generated Image" class="rounded-lg mt-2 max-w-xs md:max-w-sm"></a>`); }
+                return marked.parse(text);
+            };
+
+            // --- Mode Switching Logic ---
+            const setMode = (mode) => {
+                currentMode = mode;
+                if (mode === 'chat') {
+                    modeChatBtn.classList.add('active'); modeCodeBtn.classList.remove('active');
+                    verbosityControls.classList.add('hidden');
+                    messageInput.placeholder = 'Send a message (or use "img:")...';
+                } else {
+                    modeCodeBtn.classList.add('active'); modeChatBtn.classList.remove('active');
+                    verbosityControls.classList.remove('hidden');
+                    messageInput.placeholder = 'Enter a code prompt...';
+                }
+            };
+            modeChatBtn.addEventListener('click', () => setMode('chat'));
+            modeCodeBtn.addEventListener('click', () => setMode('code'));
+            verbosityBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    verbosityBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentVerbosity = btn.dataset.verbosity;
+                });
+            });
+
+            // --- Form Submission ---
+            chatForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const message = messageInput.value.trim();
+                if (!message) return;
+
+                appendMessage('user', message);
+                messageInput.value = '';
+                showTypingIndicator();
+
+                let endpoint = (currentMode === 'chat') ? CHAT_API_ENDPOINT : CODE_API_ENDPOINT;
+                let payload = (currentMode === 'chat') 
+                    ? { session_id: sessionId, message: message }
+                    : { prompt: message, verbosity: currentVerbosity };
+
+                try {
+                    // --- API Fetch Call using POST method ---
+                    // This is the correct way to send a POST request, as required by your FastAPI backend.
+                    const response = await fetch(endpoint, {
+                        // Method: Explicitly set to 'POST'.
+                        method: 'POST', 
+                        // Headers: Specify that the content being sent is in JSON format.
+                        headers: { 
+                            'Content-Type': 'application/json'
+                        },
+                        // Body: The JavaScript payload object is converted into a JSON string.
+                        body: JSON.stringify(payload) 
+                    });
+                    
+                    removeTypingIndicator();
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.detail || 'API request failed');
+                    }
+                    
+                    const data = await response.json();
+                    const responseText = data.response || data.code_output || 'No response text found.';
+                    const processedHtml = processAIResponse(responseText);
+                    appendMessage('ai', processedHtml);
+
+                } catch (error) {
+                    removeTypingIndicator();
+                    console.error('Error:', error);
+                    appendMessage('ai', `<strong class="text-red-400">Error:</strong> ${error.message}`);
+                }
+            });
+            
+            // --- Canvas Animation Script ---
+            const canvas = document.getElementById('space-canvas'); const ctx = canvas.getContext('2d');
+            let stars = [], blackHole, nebulas = [], sun, saturn, earth, mars, moon;
+            let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+            function init() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; sun = { x: canvas.width * 0.9, y: canvas.height * 0.1, radius: 60, parallax: 0.1 }; blackHole = { x: canvas.width / 2, y: canvas.height / 2, radius: 40, angle: 0, parallax: 0.05 }; saturn = { x: canvas.width * 0.15, y: canvas.height * 0.2, radius: 30, parallax: 0.08 }; earth = { x: canvas.width * 0.8, y: canvas.height * 0.8, radius: 25, parallax: 0.06 }; mars = { x: canvas.width * 0.2, y: canvas.height * 0.75, radius: 20, parallax: 0.07 }; moon = { orbitRadius: 45, angle: 0, parallax: 0.06 }; stars = []; const starCount = window.innerWidth > 768 ? 500 : 250; for (let i = 0; i < starCount; i++) { stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 1.5, alpha: Math.random() * 0.5 + 0.5, twinkle: Math.random() * 0.02, parallax: Math.random() * 0.04 + 0.01 }); } nebulas = []; for(let i = 0; i < 3; i++) { nebulas.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 200 + 150, color: `rgba(${100 + Math.random() * 50}, ${50 + Math.random() * 50}, ${150 + Math.random() * 50}, 0.1)`, speedX: (Math.random() - 0.5) * 0.1, speedY: (Math.random() - 0.5) * 0.1 }); } }
+            function drawSun(x, y) { ctx.save(); ctx.translate(x, y); const g = ctx.createRadialGradient(0, 0, sun.radius * 0.8, 0, 0, sun.radius * 2.5); g.addColorStop(0, 'rgba(255, 255, 220, 1)'); g.addColorStop(0.2, 'rgba(255, 220, 100, 0.5)'); g.addColorStop(0.5, 'rgba(255, 180, 50, 0.1)'); g.addColorStop(1, 'rgba(255, 150, 0, 0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, sun.radius * 2.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+            function drawSaturn(x, y) { ctx.save(); ctx.translate(x,y); ctx.strokeStyle='rgba(210,180,140,0.7)'; ctx.lineWidth=4; ctx.beginPath(); ctx.ellipse(0,0,saturn.radius*2.2,saturn.radius*0.8,-0.4,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#E3B971'; ctx.beginPath(); ctx.arc(0,0,saturn.radius,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+            function drawEarth(x, y) { ctx.save(); ctx.translate(x,y); const g=ctx.createRadialGradient(0,0,earth.radius,0,0,earth.radius*1.5); g.addColorStop(0,'rgba(100,150,255,0.3)'); g.addColorStop(1,'rgba(100,150,255,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,earth.radius*1.5,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#4D94DB'; ctx.beginPath(); ctx.arc(0,0,earth.radius,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-5,-10,20,8,0.5,0,Math.PI*2); ctx.ellipse(10,5,18,6,-0.3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+            function drawMars(x, y) { ctx.save(); ctx.translate(x, y); ctx.fillStyle = '#C1440E'; ctx.beginPath(); ctx.arc(0, 0, mars.radius, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.beginPath(); ctx.arc(0, -mars.radius + 3, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+            function drawMoon(x, y) { ctx.save(); ctx.translate(x, y); ctx.fillStyle = '#B0B0B0'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+            function draw() { ctx.clearRect(0, 0, canvas.width, canvas.height); const pX = (mouse.x - canvas.width / 2) * 0.5, pY = (mouse.y - canvas.height / 2) * 0.5; nebulas.forEach(n => { n.x += n.speedX; n.y += n.speedY; if(n.x+n.radius<0) n.x=canvas.width+n.radius; if(n.x-n.radius>canvas.width) n.x=-n.radius; if(n.y+n.radius<0) n.y=canvas.height+n.radius; if(n.y-n.radius>canvas.height) n.y=-n.radius; const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.radius); g.addColorStop(0,n.color); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height); }); stars.forEach(s => { const sx=s.x+pX*s.parallax, sy=s.y+pY*s.parallax; s.alpha+=s.twinkle; if(s.alpha>1||s.alpha<0.5) s.twinkle=-s.twinkle; ctx.globalAlpha=s.alpha; ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(sx,sy,s.radius,0,Math.PI*2); ctx.fill(); }); ctx.globalAlpha = 1; const sunX = sun.x+pX*sun.parallax, sunY = sun.y+pY*sun.parallax; const saturnX = saturn.x+pX*saturn.parallax, saturnY = saturn.y+pY*saturn.parallax; const earthX = earth.x+pX*earth.parallax, earthY = earth.y+pY*earth.parallax; const marsX = mars.x+pX*mars.parallax, marsY = mars.y+pY*mars.parallax; const bhX = blackHole.x+pX*blackHole.parallax, bhY = blackHole.y+pY*blackHole.parallax; moon.angle += 0.01; const moonX = earthX + moon.orbitRadius * Math.cos(moon.angle), moonY = earthY + moon.orbitRadius * Math.sin(moon.angle); drawSun(sunX, sunY); drawSaturn(saturnX, saturnY); drawMars(marsX, marsY); drawEarth(earthX, earthY); drawMoon(moonX, moonY); ctx.save(); ctx.translate(bhX, bhY); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(0,0,blackHole.radius,0,Math.PI*2); ctx.fill(); ctx.rotate(blackHole.angle); const dG=ctx.createLinearGradient(-blackHole.radius*2.5,0,blackHole.radius*2.5,0); dG.addColorStop(0,'rgba(255,200,0,0.8)'); dG.addColorStop(0.5,'rgba(160,60,255,0.9)'); dG.addColorStop(1,'rgba(255,200,0,0.8)'); ctx.strokeStyle=dG; ctx.lineWidth=3; ctx.shadowColor='rgba(160,60,255,0.7)'; ctx.shadowBlur=15; ctx.beginPath(); ctx.ellipse(0,0,blackHole.radius*2,blackHole.radius*0.7,0,0,Math.PI*2); ctx.stroke(); ctx.lineWidth=1.5; ctx.shadowBlur=5; ctx.beginPath(); ctx.ellipse(0,0,blackHole.radius*1.5,blackHole.radius*0.5,0,0,Math.PI*2); ctx.stroke(); ctx.restore(); blackHole.angle += 0.003; requestAnimationFrame(draw); }
+            window.addEventListener('resize', init);
+            window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+            init();
+            draw();
+        });
+    </script>
+</body>
+</html>
