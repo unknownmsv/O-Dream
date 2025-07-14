@@ -64,12 +64,12 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 POST /chat/gen
 
 Body:
-
+```
 {
   "session_id": "your-session-id",
   "message": "Hello, how are you?"
 }
-
+```
 You can also use:
 
 img: [description] → to generate images
